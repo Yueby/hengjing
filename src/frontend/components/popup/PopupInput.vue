@@ -267,7 +267,8 @@ async function handleImageFiles(files: FileList | File[]): Promise<void> {
           uploadedImages.value.push(base64)
           console.log('图片已添加到数组，当前数量:', uploadedImages.value.length)
           message.success(`图片 ${file.name} 已添加`)
-          emitUpdate()
+          // 图片添加后立即触发更新，避免防抖延迟
+          emitUpdateImmediate()
         }
         else {
           console.log('图片已存在，跳过:', file.name)
@@ -598,7 +599,13 @@ function handleTextInput(event: Event) {
   if (isComposing.value)
     return
 
-  // 不立即更新 userInput，只触发防抖的 emitUpdate
+  // 立即更新 userInput.value（用于内部状态同步）
+  const textarea = event.target as HTMLTextAreaElement
+  if (textarea) {
+    userInput.value = textarea.value
+  }
+
+  // 触发防抖的 emit（避免频繁通知父组件）
   debouncedEmitUpdate()
 }
 
@@ -615,6 +622,13 @@ function handleCompositionStart() {
 // 输入法结束组合
 function handleCompositionEnd(event: Event) {
   isComposing.value = false
+  
+  // 立即更新 userInput.value
+  const textarea = event.target as HTMLTextAreaElement
+  if (textarea) {
+    userInput.value = textarea.value
+  }
+  
   debouncedEmitUpdate()
 }
 

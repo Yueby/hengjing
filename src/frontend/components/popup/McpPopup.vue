@@ -280,8 +280,8 @@ async function handleSubmit() {
 // 处理输入更新
 function handleInputUpdate(data: { userInput: string, selectedOptions: string[], draggedImages: string[] }) {
   console.log('[DEBUG] handleInputUpdate 收到:', data)
-  // 不更新 userInput.value，避免覆盖用户正在输入的内容
-  // userInput 由子组件的 textarea 控制，父组件只在提交时读取
+  // 更新 userInput，用于 canSubmit 判断
+  userInput.value = data.userInput
   selectedOptions.value = data.selectedOptions
   draggedImages.value = data.draggedImages
 }
