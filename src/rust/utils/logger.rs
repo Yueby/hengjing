@@ -181,7 +181,6 @@ macro_rules! log_trace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     
     #[test]
     fn test_log_config_default() {

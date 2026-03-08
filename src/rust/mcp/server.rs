@@ -97,7 +97,13 @@ impl ServerHandler for HengServer {
                 "predefined_options": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "预定义的选项列表（可选）"
+                    "description": "预定义的选项列表（可选，推荐使用）"
+                },
+                "options": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "兼容旧写法的选项列表，等同于 predefined_options",
+                    "deprecated": true
                 },
                 "is_markdown": {
                     "type": "boolean",
@@ -234,8 +240,6 @@ impl ServerHandler for HengServer {
         }
     }
 }
-
-
 
 /// 启动MCP服务器
 pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {

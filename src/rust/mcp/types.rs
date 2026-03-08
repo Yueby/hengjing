@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct HengRequest {
     #[schemars(description = "要显示给用户的消息")]
     pub message: String,
-    #[schemars(description = "预定义的选项列表（可选）")]
-    #[serde(default)]
+    #[schemars(description = "预定义的选项列表（可选，兼容旧字段名 options）")]
+    #[serde(default, alias = "options")]
     pub predefined_options: Vec<String>,
     #[schemars(description = "消息是否为Markdown格式，默认为true")]
     #[serde(default = "default_is_markdown")]
@@ -138,4 +138,33 @@ pub fn build_continue_response(request_id: Option<String>, source: &str) -> Stri
 
     let response = build_mcp_response(Some(continue_prompt), vec![], vec![], request_id, source);
     response.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HengRequest;
+
+    #[test]
+    fn should_parse_predefined_options() {
+        let request: HengRequest = serde_json::from_value(serde_json::json!({
+            "message": "请选择",
+            "predefined_options": ["A", "B"]
+        }))
+        .expect("should parse predefined_options");
+
+        assert_eq!(request.predefined_options, vec!["A", "B"]);
+        assert!(request.is_markdown);
+    }
+
+    #[test]
+    fn should_parse_options_alias() {
+        let request: HengRequest = serde_json::from_value(serde_json::json!({
+            "message": "请选择",
+            "options": ["A", "B"]
+        }))
+        .expect("should parse options alias");
+
+        assert_eq!(request.predefined_options, vec!["A", "B"]);
+        assert!(request.is_markdown);
+    }
 }
