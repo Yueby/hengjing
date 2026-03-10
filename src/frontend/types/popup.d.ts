@@ -68,6 +68,7 @@ export interface McpResponse {
   user_input: string | null
   selected_options: string[]
   images: ImageAttachment[]
+  files: FileReferenceAttachment[]
   metadata: ResponseMetadata
 }
 
@@ -75,6 +76,15 @@ export interface ImageAttachment {
   data: string
   media_type: string
   filename: string | null
+}
+
+export interface FileReferenceAttachment {
+  type: 'path' | 'url'
+  path?: string
+  url?: string
+  name: string
+  kind?: 'file' | 'directory'
+  mime_type?: string | null
 }
 
 export interface ResponseMetadata {

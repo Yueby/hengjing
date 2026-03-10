@@ -68,8 +68,11 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
             get_cli_args,
             read_mcp_request,
             select_image_files,
+            open_main_devtools,
+            read_image_file_as_data_url,
             build_mcp_send_response,
             build_mcp_continue_response,
+            validate_file_reference_path,
             create_test_popup,
             
             // acemcp命令（迁移至 tools::acemcp::commands）

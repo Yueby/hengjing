@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { McpRequest } from '../../types/popup'
+import type { FileReferenceAttachment, McpRequest } from '../../types/popup'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useMessage } from 'naive-ui'
@@ -64,6 +64,7 @@ const submitting = ref(false)
 const selectedOptions = ref<string[]>([])
 const userInput = ref('')
 const draggedImages = ref<string[]>([])
+const referencedFiles = ref<FileReferenceAttachment[]>([])
 const inputRef = ref()
 
 // 继续回复配置
@@ -75,9 +76,9 @@ const isVisible = computed(() => !!props.request)
 const hasOptions = computed(() => (props.request?.predefined_options?.length ?? 0) > 0)
 const canSubmit = computed(() => {
   if (hasOptions.value) {
-    return selectedOptions.value.length > 0 || userInput.value.trim().length > 0 || draggedImages.value.length > 0
+    return selectedOptions.value.length > 0 || userInput.value.trim().length > 0 || draggedImages.value.length > 0 || referencedFiles.value.length > 0
   }
-  return userInput.value.trim().length > 0 || draggedImages.value.length > 0
+  return userInput.value.trim().length > 0 || draggedImages.value.length > 0 || referencedFiles.value.length > 0
 })
 
 // 获取输入组件的状态文本
@@ -211,6 +212,7 @@ function resetForm() {
   selectedOptions.value = []
   userInput.value = ''
   draggedImages.value = []
+  referencedFiles.value = []
   submitting.value = false
 }
 
@@ -233,17 +235,24 @@ async function handleSubmit() {
       userInput: finalUserInput,
       selectedOptions: selectedOptions.value,
       draggedImages: draggedImages.value.length,
+      referencedFiles: referencedFiles.value.length,
     })
 
     // 使用新的结构化数据格式
     const response = {
       user_input: finalUserInput.trim() || null,
       selected_options: selectedOptions.value,
-      images: draggedImages.value.map(imageData => ({
-        data: imageData.split(',')[1], // 移除 data:image/png;base64, 前缀
-        media_type: 'image/png',
-        filename: null,
-      })),
+      images: draggedImages.value.map((imageData) => {
+        const [header = '', data = ''] = imageData.split(',', 2)
+        const mediaTypeMatch = header.match(/^data:(.*?);base64$/i)
+
+        return {
+          data,
+          media_type: mediaTypeMatch?.[1] || 'image/png',
+          filename: null,
+        }
+      }),
+      files: referencedFiles.value,
       metadata: {
         timestamp: new Date().toISOString(),
         request_id: props.request?.id || null,
@@ -252,7 +261,7 @@ async function handleSubmit() {
     }
 
     // 如果没有任何有效内容，设置默认用户输入
-    if (!response.user_input && response.selected_options.length === 0 && response.images.length === 0) {
+    if (!response.user_input && response.selected_options.length === 0 && response.images.length === 0 && response.files.length === 0) {
       response.user_input = '用户确认继续'
     }
 
@@ -278,12 +287,13 @@ async function handleSubmit() {
 }
 
 // 处理输入更新
-function handleInputUpdate(data: { userInput: string, selectedOptions: string[], draggedImages: string[] }) {
+function handleInputUpdate(data: { userInput: string, selectedOptions: string[], draggedImages: string[], referencedFiles: FileReferenceAttachment[] }) {
   console.log('[DEBUG] handleInputUpdate 收到:', data)
   // 更新 userInput，用于 canSubmit 判断
   userInput.value = data.userInput
   selectedOptions.value = data.selectedOptions
   draggedImages.value = data.draggedImages
+  referencedFiles.value = data.referencedFiles
 }
 
 // 处理图片添加 - 移除重复逻辑，避免双重添加
@@ -309,6 +319,7 @@ async function handleContinue() {
       user_input: continuePrompt.value,
       selected_options: [],
       images: [],
+      files: [],
       metadata: {
         timestamp: new Date().toISOString(),
         request_id: props.request?.id || null,
@@ -368,6 +379,7 @@ Here is my original instruction:
       user_input: enhancePrompt,
       selected_options: [],
       images: [],
+      files: [],
       metadata: {
         timestamp: new Date().toISOString(),
         request_id: props.request?.id || null,

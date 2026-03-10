@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { invoke } from '@tauri-apps/api/core'
 import { onMounted, onUnmounted } from 'vue'
 import AppContent from './components/AppContent.vue'
 import { useAppManager } from './composables/useAppManager'
@@ -19,9 +20,21 @@ const handlers = useEventHandlers(actions)
 
 // 主题应用由useTheme统一管理，移除重复的主题应用逻辑
 
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'i') {
+    event.preventDefault()
+    event.stopPropagation()
+
+    invoke('open_main_devtools').catch((error) => {
+      console.error('打开开发者工具失败:', error)
+    })
+  }
+}
+
 // 初始化
 onMounted(async () => {
   try {
+    window.addEventListener('keydown', handleGlobalKeydown)
     await actions.app.initialize()
   }
   catch (error) {
@@ -31,6 +44,7 @@ onMounted(async () => {
 
 // 清理
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
   actions.app.cleanup()
 })
 </script>

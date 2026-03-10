@@ -56,14 +56,15 @@ async function startWindowDrag(event: MouseEvent | TouchEvent) {
   if (target.closest('button') || target.closest('[role="button"]') || target.closest('a')) {
     return
   }
-  
+
   // 阻止默认行为（如文本选择）
   event.preventDefault()
-  
+
   try {
     const appWindow = getCurrentWindow()
     await appWindow.startDragging()
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to start dragging:', error)
   }
 }
@@ -83,6 +84,8 @@ async function showTestMcpPopup() {
 - ✅ 支持预定义选项选择
 - ✅ 支持自由文本输入
 - ✅ 支持图片粘贴上传
+- ✅ 支持图片拖拽上传
+- ✅ 支持文件拖拽引用（将文件路径作为引用附加到响应中）
 
 ## 代码示例
 \`\`\`javascript
@@ -93,8 +96,9 @@ function testPopup() {
 }
 \`\`\`
 
-请选择您要测试的功能，或者在下方输入框中添加您的反馈。`,
-      predefined_options: ['测试选项功能', '测试文本输入', '测试图片上传', '测试Markdown渲染'],
+请选择您要测试的功能，或者在下方输入框中添加您的反馈。
+您也可以尝试将图片或普通文件直接拖拽到输入框中。`,
+      predefined_options: ['测试选项功能', '测试文本输入', '测试图片上传', '测试文件引用', '测试Markdown渲染'],
       is_markdown: true,
     }
 
@@ -112,7 +116,7 @@ function testPopup() {
 <template>
   <div class="flex flex-col min-h-screen">
     <!-- 顶部拖拽条 -->
-    <div 
+    <div
       class="fixed top-0 left-0 right-0 h-8 z-50"
       style="-webkit-user-select: none; user-select: none; cursor: default;"
       @mousedown="startWindowDrag"

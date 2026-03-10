@@ -1,6 +1,6 @@
 use crate::config::{save_config, load_config, AppState, ReplyConfig, WindowConfig, CustomPrompt, CustomPromptConfig, ShortcutConfig, ShortcutBinding};
 use crate::constants::{window, ui, validation};
-use crate::mcp::types::{build_continue_response, build_send_response, ImageAttachment, PopupRequest};
+use crate::mcp::types::{build_continue_response, build_send_response, FileReferenceAttachment, ImageAttachment, PopupRequest};
 use crate::mcp::handlers::create_tauri_popup;
 use tauri::{AppHandle, Manager, State};
 
@@ -454,6 +454,62 @@ pub async fn select_image_files() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn open_main_devtools(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "未找到主窗口".to_string())?;
+
+    window.open_devtools();
+    let _ = window.set_focus();
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn read_image_file_as_data_url(path: String) -> Result<String, String> {
+    use base64::Engine as _;
+
+    let input_path = std::path::PathBuf::from(&path);
+
+    if !input_path.exists() {
+        return Err(format!("路径不存在: {}", path));
+    }
+
+    let metadata = input_path
+        .metadata()
+        .map_err(|e| format!("读取文件信息失败: {}", e))?;
+
+    if !metadata.is_file() {
+        return Err(format!("仅支持读取普通文件: {}", path));
+    }
+
+    let media_type = guess_image_media_type_from_path(&input_path)
+        .ok_or_else(|| format!("不支持的图片类型: {}", path))?;
+
+    let bytes = std::fs::read(&input_path)
+        .map_err(|e| format!("读取图片文件失败: {}", e))?;
+
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Ok(format!("data:{};base64,{}", media_type, encoded))
+}
+
+fn guess_image_media_type_from_path(path: &std::path::Path) -> Option<&'static str> {
+    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+
+    match extension.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "bmp" => Some("image/bmp"),
+        "svg" => Some("image/svg+xml"),
+        "ico" => Some("image/x-icon"),
+        "avif" => Some("image/avif"),
+        _ => None,
+    }
+}
+
+#[tauri::command]
 pub async fn open_external_url(url: String) -> Result<(), String> {
     use std::process::Command;
 
@@ -501,6 +557,7 @@ pub fn build_mcp_send_response(
     user_input: Option<String>,
     selected_options: Vec<String>,
     images: Vec<ImageAttachment>,
+    files: Vec<FileReferenceAttachment>,
     request_id: Option<String>,
     source: String,
 ) -> Result<String, String> {
@@ -508,6 +565,7 @@ pub fn build_mcp_send_response(
         user_input,
         selected_options,
         images,
+        files,
         request_id,
         &source,
     ))
@@ -771,9 +829,46 @@ pub async fn update_conditional_prompt_state(
     Ok(())
 }
 
+#[tauri::command]
+pub fn validate_file_reference_path(path: String) -> Result<FileReferenceAttachment, String> {
+    let input_path = std::path::PathBuf::from(&path);
 
+    if !input_path.exists() {
+        return Err(format!("文件不存在: {}", path));
+    }
 
+    let metadata = input_path
+        .metadata()
+        .map_err(|e| format!("读取文件信息失败: {}", e))?;
 
+    let kind = if metadata.is_file() {
+        "file".to_string()
+    } else if metadata.is_dir() {
+        "directory".to_string()
+    } else {
+        return Err(format!("仅支持引用普通文件或目录: {}", path));
+    };
+
+    let canonical_path = input_path
+        .canonicalize()
+        .map_err(|e| format!("规范化文件路径失败: {}", e))?;
+
+    let normalized_path = normalize_path_display(&canonical_path);
+    let filename = canonical_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string())
+        .unwrap_or_else(|| normalized_path.clone());
+
+    Ok(FileReferenceAttachment {
+        r#type: "path".to_string(),
+        path: Some(normalized_path.clone()),
+        url: None,
+        name: filename,
+        kind: Some(kind),
+        mime_type: None,
+    })
+}
 
 /// 获取配置文件的真实路径
 #[tauri::command]

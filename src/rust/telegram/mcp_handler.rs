@@ -254,6 +254,7 @@ async fn handle_send_pressed(
         user_input_option,
         selected_list.clone(),
         vec![], // 无GUI模式下没有图片
+        vec![], // 无GUI模式下没有文件引用
         Some(request.id.clone()),
         "telegram",
     );

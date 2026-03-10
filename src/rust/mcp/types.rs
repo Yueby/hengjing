@@ -59,6 +59,8 @@ pub struct McpResponse {
     pub user_input: Option<String>,
     pub selected_options: Vec<String>,
     pub images: Vec<ImageAttachment>,
+    #[serde(default)]
+    pub files: Vec<FileReferenceAttachment>,
     pub metadata: ResponseMetadata,
 }
 
@@ -67,6 +69,21 @@ pub struct ImageAttachment {
     pub data: String,
     pub media_type: String,
     pub filename: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileReferenceAttachment {
+    #[serde(default = "default_file_reference_type")]
+    pub r#type: String,
+    pub path: Option<String>,
+    pub url: Option<String>,
+    pub name: String,
+    pub kind: Option<String>,
+    pub mime_type: Option<String>,
+}
+
+fn default_file_reference_type() -> String {
+    "path".to_string()
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,6 +117,7 @@ pub fn build_mcp_response(
     user_input: Option<String>,
     selected_options: Vec<String>,
     images: Vec<ImageAttachment>,
+    files: Vec<FileReferenceAttachment>,
     request_id: Option<String>,
     source: &str,
 ) -> serde_json::Value {
@@ -107,6 +125,7 @@ pub fn build_mcp_response(
         "user_input": user_input,
         "selected_options": selected_options,
         "images": images,
+        "files": files,
         "metadata": {
             "timestamp": chrono::Utc::now().to_rfc3339(),
             "request_id": request_id,
@@ -120,10 +139,11 @@ pub fn build_send_response(
     user_input: Option<String>,
     selected_options: Vec<String>,
     images: Vec<ImageAttachment>,
+    files: Vec<FileReferenceAttachment>,
     request_id: Option<String>,
     source: &str,
 ) -> String {
-    let response = build_mcp_response(user_input, selected_options, images, request_id, source);
+    let response = build_mcp_response(user_input, selected_options, images, files, request_id, source);
     response.to_string()
 }
 
@@ -136,7 +156,7 @@ pub fn build_continue_response(request_id: Option<String>, source: &str) -> Stri
         "请按照最佳实践继续".to_string()
     };
 
-    let response = build_mcp_response(Some(continue_prompt), vec![], vec![], request_id, source);
+    let response = build_mcp_response(Some(continue_prompt), vec![], vec![], vec![], request_id, source);
     response.to_string()
 }
 
