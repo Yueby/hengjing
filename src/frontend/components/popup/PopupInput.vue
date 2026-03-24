@@ -231,9 +231,13 @@ function handleOptionToggle(option: string) {
 
 // 移除了所有拖拽和上传组件相关的代码
 
+const isPlainTextPasteRequested = ref(false)
+
 async function handleImagePaste(event: ClipboardEvent) {
   const items = event.clipboardData?.items
   let hasImage = false
+  const shouldPasteAsPlainText = isPlainTextPasteRequested.value
+  isPlainTextPasteRequested.value = false
 
   if (items) {
     for (const item of items) {
@@ -253,7 +257,7 @@ async function handleImagePaste(event: ClipboardEvent) {
   else {
     const plainText = event.clipboardData?.getData('text/plain') || ''
     event.preventDefault()
-    const handledAsReference = await insertParsedContentAtCaret(plainText)
+    const handledAsReference = !shouldPasteAsPlainText && await insertParsedContentAtCaret(plainText)
     if (!handledAsReference && plainText) {
       insertTextAtCaret(plainText)
       userInput.value = getCurrentInputValue()
@@ -714,6 +718,14 @@ function handleEditorKeydown(event: KeyboardEvent) {
     return
   }
 
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'v') {
+    isPlainTextPasteRequested.value = true
+    setTimeout(() => {
+      isPlainTextPasteRequested.value = false
+    }, 1000)
+    return
+  }
+
   if (event.key !== 'Backspace' && event.key !== 'Delete') {
     return
   }
@@ -742,54 +754,14 @@ function hasInlineReferenceBadge(identity: string): boolean {
 async function insertParsedContentAtCaret(text: string): Promise<boolean> {
   const directCandidates = [...extractPathCandidates(text), ...extractUrlCandidates(text)]
   if (directCandidates.length === 1 && text.trim()) {
-    const directReference = await resolveReferenceCandidate(text.trim())
+    const directReference = await resolveReferenceCandidate(directCandidates[0])
     if (directReference && addReferencedAttachment(directReference)) {
       insertReferenceBadge(directReference)
       emitUpdateImmediate()
       return true
     }
   }
-
-  const segments = tokenizeReferenceContent(text)
-  if (!segments.some(segment => segment.type === 'candidate')) {
-    return false
-  }
-
-  const fragment = document.createDocumentFragment()
-  let insertedReference = false
-
-  for (const segment of segments) {
-    if (segment.type === 'text') {
-      if (segment.value) {
-        fragment.append(document.createTextNode(segment.value))
-      }
-      continue
-    }
-
-    const reference = await resolveReferenceCandidate(segment.value)
-    if (!reference) {
-      fragment.append(document.createTextNode(segment.value))
-      continue
-    }
-
-    const added = addReferencedAttachment(reference)
-    if (!added && !hasInlineReferenceBadge(getReferenceIdentity(reference))) {
-      fragment.append(document.createTextNode(segment.value))
-      continue
-    }
-    fragment.append(createReferenceBadgeElement(reference))
-    fragment.append(document.createTextNode(' '))
-    insertedReference = true
-  }
-
-  if (!insertedReference) {
-    return false
-  }
-
-  insertNodeAtCaret(fragment)
-  userInput.value = getCurrentInputValue()
-  emitUpdateImmediate()
-  return true
+  return false
 }
 
 async function replaceTextNodeWithInlineReferences(textNode: Text): Promise<boolean> {
@@ -1277,9 +1249,6 @@ async function savePromptOrder() {
 
 // 输入法组合状态
 const isComposing = ref(false)
-const debouncedParseInlineReferences = useDebounceFn(() => {
-  void scanEditorForInlineReferences()
-}, 180)
 
 function serializeEditorNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) {
@@ -1334,7 +1303,6 @@ function handleTextInput(event: Event) {
 
   // 触发防抖的 emit（避免频繁通知父组件）
   debouncedEmitUpdate()
-  debouncedParseInlineReferences()
 }
 
 // 输入法开始组合
@@ -1354,7 +1322,6 @@ function handleCompositionEnd(event: Event) {
   }
 
   debouncedEmitUpdate()
-  debouncedParseInlineReferences()
 }
 
 // 自动调整 textarea 高度 - 简化版，避免滚动问题
